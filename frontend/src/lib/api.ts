@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
+const API_URL = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
 export type UserRole = 'admin' | 'teacher' | 'student';
 export interface Profile { id: string; fullName: string; email: string; role: UserRole; rollNo?: string | null; mustChangePassword?: boolean }
 export interface ApiError { error: { code: string; message: string; details?: unknown } }
