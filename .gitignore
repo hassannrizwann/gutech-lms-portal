@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+outputs/
+*.xlsx
+*.xls
+*.csv
+*.tsv
+.env
+.env.*
+!.env.example
+*.log
+.gutech-dev*
+Internal LMS – AI Build Spec (React + Node + Supabase).pdf
+.DS_Store

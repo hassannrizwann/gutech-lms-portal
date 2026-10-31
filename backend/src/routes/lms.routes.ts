@@ -1,0 +1,87 @@
+import { Router } from 'express';
+import express from 'express';
+import { z } from 'zod';
+import { requireAuth, requireRole } from '../middleware/auth.js';
+import { HttpError } from '../utils/errors.js';
+import * as lms from '../services/lms.service.js';
+import type { RequestHandler } from 'express';
+
+const r = Router();
+const call = (fn: (req: express.Request, res: express.Response) => Promise<unknown>): RequestHandler => (req,res,next)=>{ void fn(req,res).catch(next); };
+const parse = <T extends z.ZodType>(schema:T, value:unknown):z.infer<T>=>schema.parse(value);
+const idSchema=z.string().uuid();
+const pageSchema=z.object({page:z.coerce.number().int().min(1).default(1),pageSize:z.coerce.number().int().min(1).max(100).default(20)});
+const page=(req:express.Request)=>pageSchema.parse(req.query);
+const params=(req:express.Request)=>({id:idSchema.parse(req.params.id)});
+const actor=(req:express.Request)=>req.user!;
+const send=(res:express.Response,data:unknown,status=200,meta?:unknown)=>res.status(status).json({data,...(meta?{meta}:{})});
+const uuidArray=z.array(idSchema).max(1000);
+const text=(min=1,max=500)=>z.string().trim().min(min).max(max);
+const attendanceDate=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>{const parsed=new Date(`${value}T00:00:00.000Z`);return !Number.isNaN(parsed.getTime())&&parsed.toISOString().slice(0,10)===value;},'Use a valid calendar date.');
+
+// Keep public auth flows and unknown routes available to the main router; LMS data routes are protected.
+r.use((req,res,next)=>{
+  if(req.path.startsWith('/auth/'))return next('router');
+  if(/^\/(admin|me|courses|assignments|submissions|quizzes|announcements|messages|resources|complaints)(\/|$)/.test(req.path))return requireAuth(req,res,next);
+  return next('router');
+});
+r.get('/admin/users',requireRole('admin'),call(async(req,res)=>{const p=page(req);const data=await lms.listUsers(String(req.query.search??''),String(req.query.role??''),p.page,p.pageSize);send(res,data.data,200,{...p,total:data.total});}));
+r.post('/admin/users',requireRole('admin'),call(async(req,res)=>{const b=parse(z.object({email:z.string().email().max(254),fullName:text(2,100),role:z.enum(['teacher','student']),rollNo:z.string().trim().max(32).optional()}),req.body);send(res,await lms.createUser(actor(req),b),201);}));
+r.patch('/admin/users/:id',requireRole('admin'),call(async(req,res)=>{const b=parse(z.object({fullName:text(2,100).optional(),role:z.enum(['admin','teacher','student']).optional(),isActive:z.boolean().optional(),rollNo:z.string().trim().max(32).nullable().optional()}),req.body);send(res,await lms.updateUser(actor(req),params(req).id,b));}));
+r.post('/admin/users/:id/reset-password',requireRole('admin'),call(async(req,res)=>send(res,await lms.resetUserPassword(actor(req),params(req).id))));
+r.get('/me/courses',call(async(req,res)=>{const p=page(req);const data=await lms.listCourses(actor(req),p.page,p.pageSize);send(res,data.data,200,{...p,total:data.total});}));
+r.get('/me/dashboard',call(async(req,res)=>send(res,await lms.dashboardSummary(actor(req)))));
+r.get('/admin/courses',requireRole('admin'),call(async(req,res)=>{const p=page(req);const d=await lms.listCourses(actor(req),p.page,p.pageSize,true);send(res,d.data,200,{...p,total:d.total});}));
+r.post('/admin/courses',requireRole('admin'),call(async(req,res)=>{const b=parse(z.object({code:text(2,20),title:text(2,120),description:z.string().max(2000).optional()}),req.body);send(res,await lms.createCourse(actor(req),b),201);}));
+r.patch('/admin/courses/:id',requireRole('admin'),call(async(req,res)=>{const b=parse(z.object({code:text(2,20).optional(),title:text(2,120).optional(),description:z.string().max(2000).optional(),isArchived:z.boolean().optional()}),req.body);send(res,await lms.updateCourse(actor(req),params(req).id,b));}));
+r.put('/admin/courses/:id/teachers',requireRole('admin'),call(async(req,res)=>{const b=parse(z.object({teacherIds:uuidArray}),req.body);send(res,await lms.assignTeachers(actor(req),params(req).id,b.teacherIds));}));
+r.get('/admin/courses/:id/teachers',requireRole('admin'),call(async(req,res)=>send(res,await lms.courseTeachers(params(req).id))));
+r.get('/admin/courses/:id/enrollments',requireRole('admin'),call(async(req,res)=>send(res,await lms.courseRoster(params(req).id))));
+r.post('/admin/courses/:id/enrollments',requireRole('admin'),call(async(req,res)=>{const b=parse(z.object({studentIds:uuidArray}),req.body);send(res,await lms.enrollStudents(actor(req),params(req).id,b.studentIds));}));
+r.delete('/admin/courses/:id/enrollments/:studentId',requireRole('admin'),call(async(req,res)=>send(res,await lms.unenrollStudent(actor(req),idSchema.parse(req.params.id),idSchema.parse(req.params.studentId)))));
+r.get('/courses/:id/attendance',requireRole('teacher','admin'),call(async(req,res)=>{const date=attendanceDate.parse(req.query.date);send(res,await lms.courseAttendance(actor(req),params(req).id,date));}));
+r.put('/courses/:id/attendance',requireRole('teacher','admin'),call(async(req,res)=>{const b=parse(z.object({date:attendanceDate,entries:z.array(z.object({studentId:idSchema,status:z.enum(['unmarked','present','absent','late','excused'])})).max(1000)}),req.body);send(res,await lms.saveCourseAttendance(actor(req),params(req).id,b.date,b.entries));}));
+r.get('/courses/:id/assignments',call(async(req,res)=>{const p=page(req);const d=await lms.listAssignments(actor(req),params(req).id,p.page,p.pageSize);send(res,d.data,200,{...p,total:d.total});}));
+r.post('/courses/:id/assignments',call(async(req,res)=>{const b=parse(z.object({title:text(2,200),instructions:text(1,10000),maxMarks:z.coerce.number().positive().max(99999),dueAt:z.string().datetime(),allowLate:z.boolean().default(false),attachmentPath:z.string().max(300).optional()}),req.body);send(res,await lms.createAssignment(actor(req),params(req).id,b),201);}));
+r.patch('/assignments/:id',call(async(req,res)=>{const b=parse(z.object({title:text(2,200).optional(),instructions:text(1,10000).optional(),maxMarks:z.coerce.number().positive().max(99999).optional(),dueAt:z.string().datetime().optional(),allowLate:z.boolean().optional()}),req.body);send(res,await lms.updateAssignment(actor(req),params(req).id,b));}));
+r.delete('/assignments/:id',call(async(req,res)=>send(res,await lms.deleteAssignment(actor(req),params(req).id))));
+r.put('/assignments/:id/submission',call(async(req,res)=>{const b=parse(z.object({textAnswer:z.string().max(20000).optional(),filePath:z.string().max(300).optional()}),req.body);if(!b.textAnswer?.trim()&&!b.filePath)throw new HttpError(422,'EMPTY_SUBMISSION','Add a written answer or upload a file.');send(res,await lms.submitAssignment(actor(req),params(req).id,b));}));
+r.get('/assignments/:id/submissions',call(async(req,res)=>{const p=page(req);const d=await lms.assignmentSubmissions(actor(req),params(req).id,p.page,p.pageSize);send(res,d.data,200,{...p,total:d.total});}));
+r.patch('/submissions/:id/grade',call(async(req,res)=>{const b=parse(z.object({marks:z.coerce.number().min(0),feedback:z.string().max(4000).optional()}),req.body);send(res,await lms.gradeSubmission(actor(req),params(req).id,b));}));
+r.post('/courses/:id/quizzes',call(async(req,res)=>{const option=z.object({id:text(1,20),text:text(1,500)});const b=parse(z.object({title:text(2,200),description:z.string().max(2000).optional(),timeLimitMinutes:z.coerce.number().int().min(1).max(600),opensAt:z.string().datetime(),closesAt:z.string().datetime(),isPublished:z.boolean().default(false),questions:z.array(z.object({type:z.enum(['mcq_single','mcq_multi','true_false']),prompt:text(1,3000),options:z.array(option).min(2).max(10),correctOptionIds:z.array(text(1,20)).min(1),marks:z.coerce.number().positive().max(999)})).min(1).max(100)}),req.body);for(const q of b.questions){const valid=new Set(q.options.map(o=>o.id));if(q.correctOptionIds.some(x=>!valid.has(x))||new Set(q.correctOptionIds).size!==q.correctOptionIds.length)throw new HttpError(422,'INVALID_ANSWERS','Correct choices must match distinct option IDs.');if(q.type!=='mcq_multi'&&q.correctOptionIds.length!==1)throw new HttpError(422,'INVALID_ANSWERS','Select exactly one correct option for this question.');}send(res,await lms.createQuiz(actor(req),params(req).id,b),201);}));
+r.get('/courses/:id/quizzes',call(async(req,res)=>{const p=page(req);const d=await lms.listQuizzes(actor(req),params(req).id,p.page,p.pageSize);send(res,d.data,200,{...p,total:d.total});}));
+r.patch('/quizzes/:id',call(async(req,res)=>{const b=parse(z.object({isPublished:z.boolean().optional(),title:text(2,200).optional(),description:z.string().max(2000).optional()}),req.body);send(res,await lms.updateQuiz(actor(req),params(req).id,b));}));
+r.post('/quizzes/:id/attempt',call(async(req,res)=>send(res,await lms.startQuiz(actor(req),params(req).id),201)));
+r.post('/quizzes/:id/attempt/submit',call(async(req,res)=>{const b=parse(z.object({attemptId:idSchema,answers:z.record(z.string(),z.array(text(1,20)).max(10))}),req.body);send(res,await lms.submitQuiz(actor(req),params(req).id,b));}));
+r.get('/quizzes/:id/results',call(async(req,res)=>{const p=page(req);const d=await lms.quizResults(actor(req),params(req).id,p.page,p.pageSize);send(res,d.data,200,{...p,total:d.total});}));
+r.get('/announcements',call(async(req,res)=>{const p=page(req);const d=await lms.listAnnouncements(actor(req),p.page,p.pageSize);send(res,d.data.map(x=>({id:x.id,title:x.title,body:x.body,pinned:x.is_pinned,createdAt:new Date(x.created_at).toLocaleDateString(),courseId:x.course_id,authorId:x.author_id})),200,{...p,total:d.total});}));
+r.post('/announcements',call(async(req,res)=>{const b=parse(z.object({courseId:idSchema.nullable().optional(),title:text(2,200),body:text(1,10000),isPinned:z.boolean().default(false)}),req.body);send(res,await lms.createAnnouncement(actor(req),b),201);}));
+r.post('/announcements/read',call(async(req,res)=>{const b=parse(z.object({announcementIds:uuidArray}),req.body);send(res,await lms.markAnnouncementsRead(actor(req),b.announcementIds));}));
+r.patch('/announcements/:id',call(async(req,res)=>{const b=parse(z.object({title:text(2,200).optional(),body:text(1,10000).optional(),isPinned:z.boolean().optional()}),req.body);send(res,await lms.updateAnnouncement(actor(req),params(req).id,b));}));
+r.delete('/announcements/:id',call(async(req,res)=>send(res,await lms.deleteAnnouncement(actor(req),params(req).id))));
+r.get('/me/marks',call(async(req,res)=>send(res,await lms.marks(actor(req),typeof req.query.courseId==='string'?req.query.courseId:undefined))));
+r.get('/courses/:id/gradebook.csv',call(async(req,res)=>{const d=await lms.gradebook(actor(req),params(req).id,1,100);const esc=(v:unknown)=>`"${String(v??'').replaceAll('"','""')}"`;const rows=['student_id,name,email,roll_no,kind,item,title,obtained,max,graded_at',...d.marks.map(m=>{const student=d.students.find(s=>s.student_id===m.student_id);const profile=Array.isArray(student?.student)?student.student[0]:student?.student;return [m.student_id,profile?.full_name,profile?.email,profile?.roll_no,m.kind,m.item_id,m.title,m.obtained,m.max,m.graded_at].map(esc).join(',');})];res.setHeader('Content-Type','text/csv; charset=utf-8');res.setHeader('Content-Disposition','attachment; filename="gradebook.csv"');res.send('\uFEFF'+rows.join('\r\n'));}));
+r.get('/courses/:id/gradebook',call(async(req,res)=>{const p=page(req);const d=await lms.gradebook(actor(req),params(req).id,p.page,p.pageSize);send(res,d,200,{...p,total:d.total});}));
+const chatLimit=new Map<string,number[]>();
+r.get('/courses/:id/messages',call(async(req,res)=>{const limit=z.coerce.number().int().min(1).max(50).default(50).parse(req.query.limit);const before=typeof req.query.before==='string'?z.string().datetime().parse(req.query.before):undefined;send(res,await lms.chatMessages(actor(req),params(req).id,before,limit));}));
+r.post('/courses/:id/messages',call(async(req,res)=>{const b=parse(z.object({body:text(1,2000)}),req.body);const key=actor(req).id;const now=Date.now();const recent=(chatLimit.get(key)??[]).filter(t=>now-t<60000);if(recent.length>=20)throw new HttpError(429,'RATE_LIMITED','Please wait before sending another message.');recent.push(now);chatLimit.set(key,recent);send(res,await lms.sendMessage(actor(req),params(req).id,b.body),201);}));
+r.delete('/messages/:id',call(async(req,res)=>send(res,await lms.deleteMessage(actor(req),params(req).id))));
+r.get('/complaints/mine',call(async(req,res)=>{const p=page(req);const d=await lms.myComplaints(actor(req),p.page,p.pageSize);send(res,d.data,200,{...p,total:d.total});}));
+r.post('/complaints',call(async(req,res)=>{const b=parse(z.object({courseId:idSchema.nullable().optional(),category:z.enum(['academic','technical','facility','conduct','other']),subject:text(2,200),description:text(10,10000),attachmentPath:z.string().max(300).optional()}),req.body);send(res,await lms.createComplaint(actor(req),b),201);}));
+r.get('/admin/complaints',requireRole('admin'),call(async(req,res)=>{const p=page(req);const d=await lms.adminComplaints(String(req.query.status??''),String(req.query.category??''),p.page,p.pageSize);send(res,d.data,200,{...p,total:d.total});}));
+r.patch('/admin/complaints/:id',requireRole('admin'),call(async(req,res)=>{const b=parse(z.object({status:z.enum(['open','in_review','resolved','rejected']),adminResponse:z.string().max(4000).optional()}),req.body);send(res,await lms.updateComplaint(actor(req),params(req).id,b));}));
+
+const mimeAllowed=new Set(['application/pdf','text/plain','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation','image/png','image/jpeg']);
+function rawFile(req:express.Request, max:number) { const bytes=req.body as Buffer;const mime=req.get('content-type')?.split(';')[0]?.trim()??'';const name=z.string().min(1).max(180).parse(req.query.fileName);if(!Buffer.isBuffer(bytes)||bytes.length===0)throw new HttpError(422,'EMPTY_FILE','Choose a non-empty file.');if(bytes.length>max)throw new HttpError(422,'FILE_TOO_LARGE',`The file exceeds ${Math.round(max/1024/1024)} MB.`);if(!mimeAllowed.has(mime))throw new HttpError(422,'INVALID_FILE_TYPE','This file type is not allowed.');const valid=mime==='application/pdf'?bytes.subarray(0,5).toString()==='%PDF-':mime==='image/png'?bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):mime==='image/jpeg'?bytes[0]===255&&bytes[1]===216:mime==='text/plain'?bytes.subarray(0,512).indexOf(0)===-1:bytes.subarray(0,2).toString()==='PK';if(!valid)throw new HttpError(422,'INVALID_FILE','The uploaded file contents do not match its file type.');return {bytes,mime,name};}
+r.post('/courses/:id/resources',express.raw({type:'application/octet-stream',limit:'25mb'}),call(async(req,res)=>{const f=rawFile(req,25*1024*1024);const title=text(2,200).parse(req.query.title);const description=typeof req.query.description==='string'?z.string().max(2000).parse(req.query.description):undefined;send(res,await lms.uploadResource(actor(req),params(req).id,f.name,f.mime,f.bytes,title,description),201);}));
+r.get('/courses/:id/resources',call(async(req,res)=>{const p=page(req);const d=await lms.listResources(actor(req),params(req).id,p.page,p.pageSize,String(req.query.search??''));send(res,d.data,200,{...p,total:d.total});}));
+r.get('/resources/:id/download',call(async(req,res)=>send(res,await lms.resourceDownload(actor(req),params(req).id))));
+r.post('/courses/:id/assignments/attachment',express.raw({type:'application/octet-stream',limit:'25mb'}),call(async(req,res)=>{const f=rawFile(req,25*1024*1024);send(res,await lms.uploadAssignmentAttachment(actor(req),params(req).id,f.name,f.mime,f.bytes),201);}));
+r.get('/assignments/:id/attachment',call(async(req,res)=>send(res,await lms.assignmentAttachment(actor(req),params(req).id))));
+r.delete('/resources/:id',call(async(req,res)=>send(res,await lms.deleteResource(actor(req),params(req).id))));
+r.post('/assignments/:id/submission-file',express.raw({type:'application/octet-stream',limit:'25mb'}),call(async(req,res)=>{const f=rawFile(req,25*1024*1024);send(res,await lms.uploadSubmissionFile(actor(req),params(req).id,f.name,f.mime,f.bytes),201);}));
+r.get('/submissions/:id/download',call(async(req,res)=>send(res,await lms.submissionDownload(actor(req),params(req).id))));
+r.post('/complaints/attachment',express.raw({type:'application/octet-stream',limit:'10mb'}),call(async(req,res)=>{const f=rawFile(req,10*1024*1024);send(res,await lms.uploadComplaintFile(actor(req),f.name,f.mime,f.bytes),201);}));
+r.get('/complaints/:id/attachment',call(async(req,res)=>send(res,await lms.complaintDownload(actor(req),params(req).id))));
+
+export default r;

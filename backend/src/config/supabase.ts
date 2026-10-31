@@ -1,0 +1,6 @@
+import { createClient } from '@supabase/supabase-js';
+import { env } from './env.js';
+
+export const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+// Restricted to admin-only services. Never import this client into routes or controllers.
+export const adminSupabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });

@@ -1,0 +1,20 @@
+import type { RequestHandler } from 'express';
+import { z } from 'zod';
+import * as authService from '../services/auth.service.js';
+import { getProfile } from '../repositories/profile.repository.js';
+const emailSchema=z.string().email().max(254);
+const passwordSchema=z.string().min(10).regex(/[A-Za-z]/).regex(/[0-9]/);
+function body<T extends z.ZodType>(schema:T,req:import('express').Request):z.infer<T>{return schema.parse(req.body);}
+const loginSchema=z.object({email:emailSchema,password:z.string().min(1).max(128)});
+const forgotSchema=z.object({email:emailSchema});
+const resetSchema=z.object({newPassword:passwordSchema});
+const changeSchema=z.object({currentPassword:z.string().min(1),newPassword:passwordSchema});
+const profileSchema=z.object({fullName:z.string().trim().min(2).max(100)});
+export const login:RequestHandler=async(req,res,next)=>{try{const {email,password}=body(loginSchema,req);const result=await authService.login(email,password);res.cookie('lms_refresh',result.refreshToken,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/api/auth',maxAge:30*24*60*60*1000});res.json({data:{accessToken:result.accessToken,profile:result.profile}});}catch(e){next(e);}};
+export const refresh:RequestHandler=async(req,res,next)=>{try{const token=req.cookies?.lms_refresh;if(!token){res.status(401).json({error:{code:'UNAUTHORIZED',message:'Please sign in again.'}});return;}const result=await authService.refresh(token);res.cookie('lms_refresh',result.refreshToken,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/api/auth',maxAge:30*24*60*60*1000});res.json({data:{accessToken:result.accessToken,profile:result.profile}});}catch(e){next(e);}};
+export const logout:RequestHandler=(req,res)=>{res.clearCookie('lms_refresh',{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/api/auth'});res.json({data:{ok:true}});};
+export const session:RequestHandler=async(req,res,next)=>{try{const profile=await getProfile(req.user!.id,req.user!.accessToken);res.json({data:{profile,accessToken:req.user!.accessToken}});}catch(e){next(e);}};
+export const forgotPassword:RequestHandler=async(req,res,next)=>{try{const {email}=body(forgotSchema,req);await authService.forgotPassword(email);res.json({data:{message:'If an account exists for that email, password reset instructions are on the way.'}});}catch(e){next(e);}};
+export const resetPassword:RequestHandler=async(req,res,next)=>{try{const {newPassword}=body(resetSchema,req);const token=req.get('authorization')?.replace(/^Bearer\s+/i,'');if(!token){res.status(401).json({error:{code:'INVALID_RESET',message:'This password reset link has expired.'}});return;}await authService.resetPassword(token,newPassword);res.json({data:{ok:true}});}catch(e){next(e);}};
+export const changePassword:RequestHandler=async(req,res,next)=>{try{const {currentPassword,newPassword}=body(changeSchema,req);await authService.changePassword(req.user!.accessToken,currentPassword,newPassword);res.json({data:{ok:true}});}catch(e){next(e);}};
+export const updateProfile:RequestHandler=async(req,res,next)=>{try{const {fullName}=body(profileSchema,req);const {createClient}=await import('@supabase/supabase-js');const client=createClient(process.env.SUPABASE_URL!,process.env.SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${req.user!.accessToken}`}},auth:{persistSession:false}});const {data,error}=await client.from('profiles').update({full_name:fullName}).eq('id',req.user!.id).select('id,full_name,email,role,roll_no,must_change_password').single();if(error)throw error;res.json({data:{id:data.id,fullName:data.full_name,email:data.email,role:data.role,rollNo:data.roll_no,mustChangePassword:data.must_change_password}});}catch(e){next(e);}};

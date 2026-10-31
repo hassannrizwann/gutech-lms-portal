@@ -1,0 +1,339 @@
+:root {
+  color-scheme: light;
+  --ink: #30232a;
+  --muted: #87777f;
+  --line: #e9dfe3;
+  --green: #9e1c28;
+  --green-dark: #7d1721;
+  --mint: #f1e5e9;
+  --app-bg: #faf6f7;
+  --surface: #ffffff;
+  --surface-alt: #fbf7f8;
+  --border: #e9dfe3;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ink: #f3e9ed;
+  --muted: #b6a5ad;
+  --line: #49343d;
+  --green: #e7a5ad;
+  --green-dark: #9e1c28;
+  --mint: #422733;
+  --app-bg: #191216;
+  --surface: #261a20;
+  --surface-alt: #302129;
+  --border: #49343d;
+}
+
+body,
+.main-area,
+.content {
+  background: var(--app-bg);
+  color: var(--ink);
+}
+
+.sidebar,
+.topbar,
+.panel,
+.course-card,
+.profile-panel,
+.feed-card,
+.login-page,
+.login-main,
+.login-card,
+.course-page-heading,
+.empty-large,
+.question-block,
+.chat-panel,
+.feedback-box,
+.submission-answer {
+  background-color: var(--surface);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+.brand-mark,
+.button-primary,
+.login-art {
+  background-color: var(--green-dark);
+}
+
+.login-art:before {
+  background: radial-gradient(ellipse at 17% 20%, #94465d 0, transparent 45%), radial-gradient(ellipse at 84% 73%, #3e101f 0, transparent 48%);
+}
+
+.nav-link.active,
+.empty-large,
+.week-date,
+.course-page-heading,
+.course-card-icon {
+  background-color: var(--mint);
+}
+
+.nav-link.active,
+.tabs button.tab-active,
+.text-button,
+.feature-link,
+.status-chip,
+.class-code,
+.welcome-row h1 span {
+  color: var(--green);
+}
+
+.button-primary,
+.tabs button.tab-active {
+  border-color: var(--green-dark);
+}
+
+.search-trigger,
+.theme-toggle,
+.icon-button,
+.button-outline,
+.csv-import textarea,
+.chat-compose input,
+.compact-form input,
+.compact-form select,
+.compact-form textarea,
+.course-select select,
+.panel-heading > input,
+.profile-form input,
+.profile-form select,
+.profile-form textarea {
+  color: var(--ink);
+  border-color: var(--border);
+  background-color: var(--surface);
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.login-theme-toggle {
+  margin: 0 0 10px auto;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 28px;
+}
+
+.teacher-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metric-card {
+  display: grid;
+  gap: 6px;
+  min-height: 104px;
+  padding: 17px 19px;
+}
+
+.metric-card > strong {
+  color: var(--green);
+  font-size: 29px;
+  line-height: 1.1;
+}
+
+.metric-card > small,
+.course-enrollment {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.course-enrollment {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.course-enrollment strong {
+  color: var(--green);
+}
+
+.attendance-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.attendance-summary span {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.attendance-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(170px, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.attendance-controls .course-select {
+  margin: 0;
+}
+
+.attendance-controls input[type='date'] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.attendance-refresh,
+.attendance-save {
+  min-height: 38px;
+}
+
+.attendance-panel {
+  margin-top: 16px;
+}
+
+.attendance-save {
+  margin-top: 16px;
+}
+
+.attendance-table select {
+  min-width: 125px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] .main-area,
+:root[data-theme='dark'] .content,
+:root[data-theme='dark'] .login-page {
+  background: var(--app-bg);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .sidebar,
+:root[data-theme='dark'] .topbar,
+:root[data-theme='dark'] .panel,
+:root[data-theme='dark'] .course-card,
+:root[data-theme='dark'] .profile-panel,
+:root[data-theme='dark'] .feed-card,
+:root[data-theme='dark'] .login-main,
+:root[data-theme='dark'] .login-card,
+:root[data-theme='dark'] .question-block,
+:root[data-theme='dark'] .chat-panel,
+:root[data-theme='dark'] .empty-large,
+:root[data-theme='dark'] .course-page-heading {
+  background-color: var(--surface);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+:root[data-theme='dark'] .sidebar .nav-link,
+:root[data-theme='dark'] .course-nav-link,
+:root[data-theme='dark'] .muted,
+:root[data-theme='dark'] .page-heading > p,
+:root[data-theme='dark'] .course-card > p,
+:root[data-theme='dark'] .notice-copy p,
+:root[data-theme='dark'] .feed-card p,
+:root[data-theme='dark'] .table-scroll td small {
+  color: var(--muted);
+}
+
+:root[data-theme='dark'] .sidebar .nav-link.active {
+  background: var(--mint);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] input,
+:root[data-theme='dark'] select,
+:root[data-theme='dark'] textarea,
+:root[data-theme='dark'] .chat-compose input,
+:root[data-theme='dark'] .compact-form input,
+:root[data-theme='dark'] .compact-form select,
+:root[data-theme='dark'] .compact-form textarea,
+:root[data-theme='dark'] .course-select select,
+:root[data-theme='dark'] .panel-heading > input,
+:root[data-theme='dark'] .profile-form input,
+:root[data-theme='dark'] .attendance-table select {
+  border-color: var(--border);
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .table-scroll th,
+:root[data-theme='dark'] .table-scroll td,
+:root[data-theme='dark'] .notice-item,
+:root[data-theme='dark'] .profile-divider,
+:root[data-theme='dark'] .profile-mini {
+  border-color: var(--border);
+}
+
+:root[data-theme='dark'] .chat-message {
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .own-message {
+  background: #4a2837;
+}
+
+:root[data-theme='dark'] .status-chip {
+  background: #49303a;
+  color: #f0c6d3;
+}
+
+/* Keep the supplied wordmark compact in both the sidebar and sign-in header. */
+.brand img.brand-logo {
+  display: block !important;
+  width: 190px !important;
+  height: 45px !important;
+  max-width: 100% !important;
+  max-height: 45px !important;
+  object-fit: contain;
+  flex: 0 1 190px;
+}
+
+.side-brand,
+.side-brand .brand {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.side-brand .brand img.brand-logo {
+  width: 182px !important;
+  height: 43px !important;
+  max-height: 43px !important;
+  flex-basis: 182px;
+}
+
+.login-main > .brand {
+  align-self: flex-start;
+}
+
+@media (max-width: 850px) {
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .attendance-controls { grid-template-columns: 1fr 1fr; }
+  .attendance-refresh { justify-self: start; }
+}
+
+@media (max-width: 620px) {
+  .metric-grid { grid-template-columns: 1fr; margin: 13px 0 21px; }
+  .attendance-controls { grid-template-columns: 1fr; }
+  .attendance-table { min-width: 520px; }
+}

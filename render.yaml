@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: gutech-lms-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build --workspace=backend
+    startCommand: npm run start --workspace=backend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: PASSWORD_RESET_REDIRECT
+        sync: false

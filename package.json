@@ -1,0 +1,8 @@
+{
+  "name": "gutech-internal-lms",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["frontend", "backend"],
+  "scripts": { "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"", "build": "npm run build -w frontend && npm run build -w backend", "test": "npm run test --workspaces --if-present", "db:reset": "supabase db reset", "lint": "npm run lint --workspaces --if-present" },
+  "devDependencies": { "concurrently": "^9.2.1", "supabase": "^2.39.2" }
+}
