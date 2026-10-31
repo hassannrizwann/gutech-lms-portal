@@ -1,41 +1,41 @@
 # GUTECH deployment
 
-This project deploys as a Vercel static frontend, a Render Node API, and the existing Supabase project.
+The supported no-card setup is two Vercel projects (React frontend and Express API) backed by the existing Supabase project. The repository is `https://github.com/hassannrizwann/gutech-lms-portal`.
 
-## 1. Push the source to a public GitHub repository
-
-Create a repository named `gutech-lms-portal` and push this folder's source. Confirm `.env`, `.env.local`, `outputs/`, and the credentials workbook are ignored before the first push. The local seed uses `@demo.invalid` accounts and is for local reset only.
-
-## 2. Apply the Supabase schema
+## 1. Apply the Supabase schema
 
 In the Supabase SQL Editor for the GUTECH project, confirm which migrations have already been applied. Apply any missing files from `supabase/migrations/` in numeric order. Apply `0004_attendance.sql` if the attendance table is missing. Do not rerun a migration that already created its objects; migrations are not generally safe to apply twice.
 
-Keep the service role key private. It is only for the Render API environment; the browser receives the anon key.
+Keep the service role key private. It belongs only in the API project's protected environment variables; the browser receives the anon/public key.
 
-## 3. Deploy the API to Render
+## 2. Deploy the API project
 
-Create a Blueprint from the GitHub repository and use `render.yaml`. Set these values on the Render service:
+In Vercel, import the repository as a new project named `gutech-lms-api` and set **Root Directory** to `backend`. Vercel detects the Express entry point at `backend/index.ts`.
 
-- `SUPABASE_URL`: project URL
-- `SUPABASE_ANON_KEY`: project anon/public key
-- `SUPABASE_SERVICE_ROLE_KEY`: project service-role/secret key
-- `CLIENT_ORIGIN`: exact Vercel site origin, without a trailing slash
-- `PASSWORD_RESET_REDIRECT`: the Vercel site URL plus `/reset-password`
+Set these Production environment variables in the API project's Settings before using the API:
 
-Wait for Render's `/health` check to pass and copy the API origin, for example `https://gutech-lms-api.onrender.com`.
+- `SUPABASE_URL`: Supabase project URL
+- `SUPABASE_ANON_KEY`: Supabase anon/public key
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service-role/secret key
+- `CLIENT_ORIGIN`: exact frontend Vercel origin, without a trailing slash
+- `PASSWORD_RESET_REDIRECT`: frontend URL plus `/reset-password`
 
-## 4. Deploy the frontend to Vercel
+Never commit or share the service-role key. Enter it directly in Vercel's protected environment-variable settings.
 
-Import the same repository. Keep the project root at the repository root; `vercel.json` builds `frontend` and serves its `dist` output. Set these Vercel environment variables for Production (and Preview if needed):
+## 3. Deploy the frontend project
 
-- `VITE_API_URL`: Render API origin plus `/api`
-- `VITE_SUPABASE_URL`: project URL
-- `VITE_SUPABASE_ANON_KEY`: project anon/public key
+Import the same repository as a second Vercel project named `gutech-lms-portal` and set **Root Directory** to `frontend`. `frontend/vercel.json` builds the Vite app and serves its SPA routes.
 
-Deploy, copy the Vercel URL, then update Render's `CLIENT_ORIGIN` and `PASSWORD_RESET_REDIRECT` with that exact URL and redeploy the API. Add the Vercel URL and its `/reset-password` path to Supabase Auth's site URL and redirect URL allowlist.
+Set these Production environment variables before deployment:
 
-## 5. Verify
+- `VITE_API_URL`: API project URL plus `/api`
+- `VITE_SUPABASE_URL`: Supabase project URL
+- `VITE_SUPABASE_ANON_KEY`: Supabase anon/public key
 
-Open `/login`, sign in with an existing account, and check role-based pages and read/write flows. Verify attendance after applying its migration. Render's free service can sleep when idle, so the first request after inactivity may take longer.
+After the frontend deployment succeeds, set `CLIENT_ORIGIN` and `PASSWORD_RESET_REDIRECT` on the API project to the exact frontend URL and redeploy the API.
 
-The values in local `.env` files should be entered by the project owner into each provider's private environment-variable settings. Never commit or paste the service-role key into Vercel or frontend code.
+## 4. Configure Supabase Auth and verify
+
+Add the frontend URL as the Supabase Auth site URL and add its `/reset-password` URL to the redirect allowlist. Open `/login`, sign in with an existing account, and verify role-based pages and read/write flows. Verify attendance after applying its migration.
+
+Only `.env.example` files belong in source control. Local `.env` values should be entered directly into the corresponding provider's private environment settings.

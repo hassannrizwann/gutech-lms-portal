@@ -32,7 +32,7 @@ Only `.env.example` files belong in source control. Never put the Supabase servi
 
 ## Production deployment
 
-The repository includes a Vercel configuration for the static React frontend and a Render Blueprint for the Express API. Deploy the API first, then set its `CLIENT_ORIGIN` to the Vercel URL. In Vercel, set `VITE_API_URL` to the Render URL plus `/api`, and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the Supabase project. In Render, set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CLIENT_ORIGIN`, and `PASSWORD_RESET_REDIRECT`; the service role key belongs only in Render's secret environment variables. Set the Supabase Auth site URL and password-reset redirect allowlist to the deployed Vercel domain.
+The project can be deployed as two Vercel projects: the Express API with root directory `backend`, then the React frontend with root directory `frontend`. Set the API's Supabase variables and service-role key in its protected environment settings. Set `VITE_API_URL` in the frontend project to the API URL plus `/api`, then set the API's `CLIENT_ORIGIN` and password-reset redirect to the frontend URL. `render.yaml` is also provided as an alternative API deployment Blueprint. Set the Supabase Auth site URL and password-reset redirect allowlist to the deployed frontend domain.
 
 Before going live, apply the migrations in `supabase/migrations/` to the hosted Supabase project. In particular, apply `0004_attendance.sql` to enable persistent attendance. Do not deploy until the Supabase URL and required environment keys are valid and set on both services. See the local `.env.example` files for each service's variable names.
 
